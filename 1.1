@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>Wąż zbiera czaszki</title>
+  <style>
+    body {
+      background-color: #111;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      height: 100vh;
+      margin: 0;
+      font-family: Arial, sans-serif;
+      color: white;
+      padding-top: 30px;
+    }
+    h1 {
+      font-size: 32px;
+      margin-bottom: 20px;
+      align-self: flex-start;
+      margin-left: 30px;
+    }
+    canvas {
+      background-color: #222;
+      border: 5px solid #fff;
+      box-shadow: 0 0 20px lime;
+    }
+    #message, #score, #highscore {
+      margin-top: 20px;
+      font-size: 24px;
+    }
+    #restart {
+      margin-top: 15px;
+      padding: 10px 20px;
+      font-size: 18px;
+      background: #fff;
+      color: #222;
+      border: none;
+      cursor: pointer;
+      border-radius: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Kółko i Krzyżyk</h1>
+
+<canvas id="game" width="600" height="600"></canvas>
+
+<div id="score">Wynik: 0</div>
+<div id="highscore">Rekord: 0</div>
+<div id="message"></div>
+<button id="restart" onclick="restartGame()">Restart</button>
+
+<!-- Dźwięk -->
+<audio id="eatSound">
+  <source src="https://actions.google.com/sounds/v1/cartoon/pop.ogg" type="audio/ogg">
+  Twój przeglądarka nie obsługuje audio.
+</audio>
+
+<script>
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const box = 30;
+  let snake = [{x: 10 * box, y: 10 * box}];
+  let skull = spawnSkull();
+  let direction = '';
+  let score = 0;
+  let highscore = 0;
+  let gameInterval;
+  let blink = true;
+  const eatSound = document.getElementById('eatSound');
+
+  document.addEventListener('keydown', dir);
+
+  function dir(event) {
+    if (event.key === 'ArrowLeft' && direction !== 'RIGHT') direction = 'LEFT';
+    else if (event.key === 'ArrowUp' && direction !== 'DOWN') direction = 'UP';
+    else if (event.key === 'ArrowRight' && direction !== 'LEFT') direction = 'RIGHT';
+    else if (event.key === 'ArrowDown' && direction !== 'UP') direction = 'DOWN';
+  }
+
+  function spawnSkull() {
+    const min = 1;
+    const max = (canvas.width / box) - 2;
+    return {
+      x: Math.floor(Math.random() * (max - min + 1) + min) * box,
+      y: Math.floor(Math.random() * (max - min + 1) + min) * box
+    };
+  }
+
+  function drawRoundedRect(x, y, width, height, radius, color) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    ctx.lineTo(x + radius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.fill();
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // rysowanie kreskówkowego węża
+    for (let i = 0; i < snake.length; i++) {
+      const color = (i === 0) ? '#00FF00' : '#66FF66';
+      drawRoundedRect(snake[i].x, snake[i].y, box, box, 10, color);
+    }
+
+    // rysowanie czaszki (migająca)
+    if (blink) {
+      ctx.fillStyle = 'white';
+      ctx.font = "50px Arial";
+      ctx.fillText("☠", skull.x - 10, skull.y + 40);
+    }
+
+    let snakeX = snake[0].x;
+    let snakeY = snake[0].y;
+
+    if (direction === 'LEFT') snakeX -= box;
+    if (direction === 'UP') snakeY -= box;
+    if (direction === 'RIGHT') snakeX += box;
+    if (direction === 'DOWN') snakeY += box;
+
+    // kolizja ze ścianą
+    if (snakeX < 0 || snakeY < 0 || snakeX >= canvas.width || snakeY >= canvas.height) {
+      gameOver();
+      return;
+    }
+
+    // kolizja z samym sobą
+    for (let i = 1; i < snake.length; i++) {
+      if (snakeX === snake[i].x && snakeY === snake[i].y) {
+        gameOver();
+        return;
+      }
+    }
+
+    if (snakeX === skull.x && snakeY === skull.y) {
+      score++;
+      document.getElementById('score').innerText = "Wynik: " + score;
+      if (score > highscore) {
+        highscore = score;
+        document.getElementById('highscore').innerText = "Rekord: " + highscore;
+      }
+      eatSound.play();
+      skull = spawnSkull();
+    } else {
+      snake.pop();
+    }
+
+    let newHead = {x: snakeX, y: snakeY};
+    snake.unshift(newHead);
+  }
+
+  function gameOver() {
+    clearInterval(gameInterval);
+    document.getElementById('message').innerText = "Przegrałeś!";
+  }
+
+  function restartGame() {
+    snake = [{x: 10 * box, y: 10 * box}];
+    direction = '';
+    score = 0;
+    document.getElementById('score').innerText = "Wynik: 0";
+    document.getElementById('message').innerText = '';
+    skull = spawnSkull();
+    clearInterval(gameInterval);
+    gameInterval = setInterval(draw, 150); // wolniejsze tempo
+  }
+
+  gameInterval = setInterval(draw, 150); // WOLNIEJSZA gra
+
+  // migotanie czaszki
+  setInterval(() => {
+    blink = !blink;
+  }, 400);
+</script>
+
+</body>
+</html>
